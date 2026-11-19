@@ -1,66 +1,52 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Construit telegram/queue.json : la liste ordonnée des posts (1 par jour).
-Scanne reels/ (Facile, 62 FR + 62 EN) et reels_niveau/ (30 FR + 30 EN).
-Ordre : Facile interleavé FR/EN, puis Niveau interleavé FR/EN.
-Relance ce script si tu ajoutes des vidéos :  python telegram/build_queue.py
+Construit telegram/queue.json : la liste ordonnée des posts (1 par exécution).
+
+RÉGLAGE ACTUEL (18 nov. 2026) : FRANÇAIS SEULEMENT, ordre Difficile -> Moyen -> Facile.
+  1) Difficile FR : niv_fr_21..30  (10)
+  2) Moyen FR     : niv_fr_01..20  (20)
+  3) Facile FR    : qotd_FR_01..62 (62)
+  => 92 posts FR (~3 mois). L'anglais sera ajouté plus tard.
+
+Relance après avoir changé l'ordre ou ajouté des vidéos :  python telegram/build_queue.py
 """
-import os, re, json, glob
+import os, json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-CAP = {
-    ("facile", "FR"): (
-        "🩺 <b>Question du jour</b> — MCCQE Partie I &amp; NAC\n"
-        "Teste-toi 👇 la réponse est dans la vidéo.\n\n"
-        "🎯 6000+ questions, 100% bilingue FR/EN → eliteqbank.com"
-    ),
-    ("facile", "EN"): (
-        "🩺 <b>Question of the day</b> — MCCQE Part I &amp; NAC\n"
-        "Test yourself 👇 the answer is in the video.\n\n"
-        "🎯 6000+ questions, fully bilingual EN/FR → eliteqbank.com"
-    ),
-    ("niveau", "FR"): (
-        "🩺 <b>Question clinique</b> — MCCQE Partie I &amp; NAC\n"
-        "Niveau supérieur 👇 saute en fin de vidéo pour la correction.\n\n"
-        "🎯 La banque complète, 100% bilingue → eliteqbank.com"
-    ),
-    ("niveau", "EN"): (
-        "🩺 <b>Clinical question</b> — MCCQE Part I &amp; NAC\n"
-        "Higher level 👇 the answer is at the end of the video.\n\n"
-        "🎯 The full bank, fully bilingual → eliteqbank.com"
-    ),
-}
+DIFFICILE = list(range(21, 31))   # 21..30
+MOYEN = list(range(1, 21))        # 1..20
+FACILE = list(range(1, 63))       # 1..62
 
-def nums(pattern):
-    out = []
-    for p in glob.glob(os.path.join(ROOT, pattern)):
-        m = re.search(r"_(\d+)\.mp4$", os.path.basename(p))
-        if m:
-            out.append(m.group(1))
-    return sorted(set(out), key=int)
+CAP_NIV = (
+    "🩺 <b>Question clinique — niveau {niv}</b>\n"
+    "MCCQE Partie I &amp; NAC · saute en fin de vidéo pour la correction 👇\n\n"
+    "🎯 La banque complète, 100% bilingue FR/EN → eliteqbank.com"
+)
+CAP_FACILE = (
+    "🩺 <b>Question du jour</b> — MCCQE Partie I &amp; NAC\n"
+    "Teste-toi 👇 la réponse est dans la vidéo.\n\n"
+    "🎯 6000+ questions, 100% bilingue FR/EN → eliteqbank.com"
+)
 
-def interleave(fr_rel, en_rel, kind):
-    fr_n = nums(fr_rel.replace("{n}", "*"))
-    en_n = nums(en_rel.replace("{n}", "*"))
-    items = []
-    for n in sorted(set(fr_n) | set(en_n), key=int):
-        if n in fr_n:
-            items.append({"media": fr_rel.replace("{n}", n), "lang": "FR",
-                          "caption": CAP[(kind, "FR")]})
-        if n in en_n:
-            items.append({"media": en_rel.replace("{n}", n), "lang": "EN",
-                          "caption": CAP[(kind, "EN")]})
-    return items
+def add(items, media, caption):
+    if os.path.exists(os.path.join(ROOT, media)):
+        items.append({"media": media, "lang": "FR", "caption": caption})
+    else:
+        print("  (absent, ignoré) " + media)
 
 queue = []
-queue += interleave("reels/qotd_FR_{n}.mp4", "reels/qotd_EN_{n}.mp4", "facile")
-queue += interleave("reels_niveau/niv_fr_{n}.mp4", "reels_niveau/niv_en_{n}.mp4", "niveau")
+for n in DIFFICILE:
+    add(queue, f"reels_niveau/niv_fr_{n:02d}.mp4", CAP_NIV.format(niv="Difficile"))
+for n in MOYEN:
+    add(queue, f"reels_niveau/niv_fr_{n:02d}.mp4", CAP_NIV.format(niv="Moyen"))
+for n in FACILE:
+    add(queue, f"reels/qotd_FR_{n:02d}.mp4", CAP_FACILE)
 
 out = os.path.join(ROOT, "telegram", "queue.json")
 with open(out, "w", encoding="utf-8") as f:
     json.dump(queue, f, ensure_ascii=False, indent=1)
 
-print(f"queue.json écrit : {len(queue)} posts "
-      f"({len(queue)} jours ≈ {len(queue)//30} mois de contenu quotidien)")
+print(f"queue.json : {len(queue)} posts FR "
+      f"(Difficile {len(DIFFICILE)} + Moyen {len(MOYEN)} + Facile {len(FACILE)}) ≈ {len(queue)//30} mois")

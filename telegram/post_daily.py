@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Poste le contenu du jour sur le canal Telegram EliteQBank.
+Poste le prochain contenu de la file sur le canal Telegram EliteQBank.
 Sans dépendance externe (stdlib only). Lancé chaque jour par GitHub Actions.
 
-L'index du jour est calculé par la DATE (déterministe, sans état) :
-  idx = (aujourd'hui - START).days  ->  queue[idx % len(queue)]
-Un jour manqué est simplement sauté ; le lendemain reprend normalement.
+Mode COMPTEUR : chaque exécution poste l'élément `next` de la file, puis
+incrémente `telegram/state.json`. Indépendant du fuseau horaire : pas de
+doublon, pas de saut. En fin de file, ça recommence (modulo).
 
 Variables d'environnement :
   TELEGRAM_BOT_TOKEN  (obligatoire)  le token @BotFather
   TELEGRAM_CHAT_ID    (obligatoire)  ex. @eliteqbank
-  DRY_RUN=1           (optionnel)    n'envoie rien, affiche seulement
-  DAY_OFFSET=<n>      (optionnel)    décale l'index (test manuel)
+  DRY_RUN=1           (optionnel)    n'envoie rien et n'avance pas le compteur
 """
-import os, sys, json, datetime, urllib.request, urllib.parse
+import os, sys, json, datetime, urllib.request, urllib.parse, urllib.error
 
 BASE = "https://raw.githubusercontent.com/aminemanai1920/eqb-media/main/"
-START = datetime.date(2026, 11, 18)   # jour index 0 — 1re publication
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
@@ -26,26 +24,24 @@ def main():
     if not queue:
         print("queue.json vide"); return
 
+    state_path = os.path.join(here, "state.json")
+    try:
+        nxt = int(json.load(open(state_path, encoding="utf-8"))["next"])
+    except Exception:
+        nxt = 0
+
     dry = os.environ.get("DRY_RUN") == "1"
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat = os.environ.get("TELEGRAM_CHAT_ID")
 
-    offset = int(os.environ.get("DAY_OFFSET", "0"))
-    today = datetime.date.today()
-    idx = (today - START).days + offset
-    if idx < 0:
-        print(f"[{today}] Pas encore commencé (START={START}).")
-        return
-
-    item = queue[idx % len(queue)]
-    media = item["media"]
-    caption = item["caption"]
+    i = nxt % len(queue)
+    item = queue[i]
+    media, caption = item["media"], item["caption"]
     url = BASE + media
     method = "sendVideo" if media.endswith(".mp4") else "sendPhoto"
     field = "video" if method == "sendVideo" else "photo"
 
-    print(f"[{today}] idx={idx} ({idx % len(queue)+1}/{len(queue)}) "
-          f"-> {method} {media} [{item.get('lang','')}]")
+    print(f"Post #{nxt+1} (file {i+1}/{len(queue)}) -> {method} {media} [{item.get('lang','')}]")
 
     if dry or not token or not chat:
         if not dry:
@@ -62,10 +58,14 @@ def main():
             resp = json.load(r)
     except urllib.error.HTTPError as e:
         print("HTTP", e.code, e.read().decode("utf-8", "replace")); sys.exit(1)
-    if resp.get("ok"):
-        print("✅ Publié (message_id =", resp["result"].get("message_id"), ")")
-    else:
+    if not resp.get("ok"):
         print("❌", resp); sys.exit(1)
+
+    print("✅ Publié (message_id =", resp["result"].get("message_id"), ")")
+    # avance le compteur SEULEMENT après succès
+    with open(state_path, "w", encoding="utf-8") as f:
+        json.dump({"next": nxt + 1, "updated": str(datetime.date.today())}, f,
+                  ensure_ascii=False, indent=1)
 
 if __name__ == "__main__":
     main()

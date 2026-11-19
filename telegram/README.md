@@ -1,40 +1,43 @@
 # 🤖 Pilote automatique Telegram — EliteQBank
 
-Poste **une Question du jour** (Reel vidéo) sur le canal Telegram **chaque matin**, tout seul,
+Poste **un Reel (Question du jour)** sur le canal Telegram **chaque matin**, tout seul,
 via GitHub Actions. Aucun serveur, aucun abonnement.
 
-## Ce que ça fait
-- `queue.json` : la file de 184 posts (124 Facile FR/EN + 60 Niveau FR/EN), 1 par jour ≈ **6 mois**.
-- `post_daily.py` : choisit le post du jour (par la date) et l'envoie au canal.
-- `.github/workflows/telegram-daily.yml` : cron quotidien à **13:00 UTC** (= 08:00 Toronto l'hiver).
-- Quand la file est finie, elle **recommence** (le contenu est evergreen).
+## Réglage actuel (18 nov. 2026)
+- **Français seulement** pour l'instant (l'anglais sera ajouté plus tard).
+- **Ordre : Difficile → Moyen → Facile.**
+- `queue.json` : **92 posts FR** (10 Difficile + 20 Moyen + 62 Facile) ≈ **3 mois**, puis ça recommence.
+- **1 post / jour** à **13:00 UTC** (= 08:00 Toronto l'hiver).
+
+## Comment ça marche
+- `post_daily.py` : poste le **prochain** élément de la file, puis avance le compteur `state.json`.
+  → Mode « compteur » : **chaque exécution = le suivant**, sans doublon ni saut, quel que soit le fuseau.
+- `.github/workflows/telegram-daily.yml` : lance le script chaque jour + sauvegarde l'avancement.
+- `build_queue.py` : régénère `queue.json` (après avoir changé l'ordre ou ajouté des vidéos).
+- `state.json` : `{"next": N}` — le prochain post à envoyer (remettre à `0` pour repartir du début).
 
 ## Mise en route (une seule fois) — 3 étapes
 
 ### 1. Créer le bot
-1. Dans Telegram, ouvre **@BotFather** → `/newbot`.
-2. Nom : `EliteQBank` · identifiant : `eliteqbank_bot` (ou autre finissant par `_bot`).
-3. BotFather te donne un **token** du type `123456:ABC-...`. **Garde-le**, ne le partage jamais en clair.
+Telegram → **@BotFather** → `/newbot` → nom `EliteQBank`, identifiant `eliteqbank_bot`.
+Il te donne un **token** `123456:ABC-...` → garde-le, ne le partage jamais en clair.
 
 ### 2. Faire du bot un admin du canal
-1. Canal `@eliteqbank` → **Gérer** → **Administrateurs** → **Ajouter**.
-2. Cherche ton bot (`@eliteqbank_bot`) → ajoute-le avec le droit **Publier des messages**.
+Canal `@eliteqbank` → **Administrateurs** → **Ajouter** → ton bot → droit **Publier des messages**.
 
 ### 3. Donner les 2 secrets à GitHub
-Dépôt **aminemanai1920/eqb-media** → **Settings** → **Secrets and variables** → **Actions** → **New repository secret** :
+Dépôt **aminemanai1920/eqb-media** → **Settings → Secrets and variables → Actions** → **New repository secret** :
 - `TELEGRAM_BOT_TOKEN` = le token de BotFather
 - `TELEGRAM_CHAT_ID` = `@eliteqbank`
 
-C'est tout. Le lendemain matin, le 1er post part tout seul.
-
-## Tester tout de suite (sans attendre demain)
-Onglet **Actions** du dépôt → **Telegram — Question du jour** → **Run workflow**.
-→ Ça poste immédiatement le post du jour sur le canal.
+## Tester tout de suite
+Onglet **Actions** → **Telegram — Question du jour** → **Run workflow**.
+→ Poste le prochain Reel sur le canal (et avance le compteur).
 
 ## Régler / modifier
-- **Changer l'heure** : édite la ligne `cron:` dans le workflow (format UTC).
-- **Changer l'ordre / le contenu** : édite `queue.json` (ou relance `python telegram/build_queue.py` après avoir ajouté des vidéos).
-- **2 posts par jour** : duplique l'étape dans le workflow avec un `DAY_OFFSET` différent, ou ajoute un 2e cron.
+- **Passer au bilingue / changer l'ordre** : édite `build_queue.py` puis `python telegram/build_queue.py`.
+- **Changer l'heure** : la ligne `cron:` du workflow (format UTC).
+- **Repartir du début** : mets `{"next": 0}` dans `state.json`.
 - **Pause** : désactive le workflow dans l'onglet Actions.
 
 *Mis en place le 18 novembre 2026 · marketing EliteQBank.*

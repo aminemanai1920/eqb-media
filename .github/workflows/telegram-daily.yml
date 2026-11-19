@@ -1,11 +1,14 @@
 name: Telegram — Question du jour
 
-# Poste automatiquement une Question du jour sur le canal Telegram EliteQBank.
+# Poste automatiquement un Reel (Question du jour) sur le canal Telegram EliteQBank.
 on:
   schedule:
     # 13:00 UTC = 08:00 à Toronto (hiver) / 09:00 (été). Change l'heure ici si besoin.
     - cron: "0 13 * * *"
   workflow_dispatch: {}   # permet aussi de le lancer à la main depuis l'onglet Actions
+
+permissions:
+  contents: write          # pour sauvegarder l'avancement (state.json)
 
 jobs:
   post:
@@ -24,3 +27,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python telegram/post_daily.py
+
+      - name: Sauvegarder l'avancement
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add telegram/state.json
+          git commit -m "Telegram: avance la file" || echo "rien à committer"
+          git push || echo "push ignoré"
