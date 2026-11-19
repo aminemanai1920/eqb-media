@@ -17,7 +17,7 @@ Variables d'environnement :
 import os, sys, json, datetime, urllib.request, urllib.parse
 
 BASE = "https://raw.githubusercontent.com/aminemanai1920/eqb-media/main/"
-START = datetime.date(2026, 11, 19)   # jour index 0 — 1re publication
+START = datetime.date(2026, 11, 18)   # jour index 0 — 1re publication
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
