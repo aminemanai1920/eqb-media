@@ -1,0 +1,26 @@
+name: Telegram — Question du jour
+
+# Poste automatiquement une Question du jour sur le canal Telegram EliteQBank.
+on:
+  schedule:
+    # 13:00 UTC = 08:00 à Toronto (hiver) / 09:00 (été). Change l'heure ici si besoin.
+    - cron: "0 13 * * *"
+  workflow_dispatch: {}   # permet aussi de le lancer à la main depuis l'onglet Actions
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publier le post du jour
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python telegram/post_daily.py
